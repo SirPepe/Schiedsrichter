@@ -1,0 +1,87 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Schiedsrichter</title>
+<script src="shims.js"></script>
+<script src="jquery.js"></script>
+<style>
+  body {
+    text-align: center
+  }
+  canvas {
+    box-shadow: 0 0 1.5em rgba(0, 0, 0, 0.5);
+    margin: 2em;
+  }
+</style>
+
+
+<video style="display:none"></video>
+
+<canvas></canvas>
+
+
+<script>
+
+var $video = $('video');
+var video = $video[0];
+
+var $canvas = $('canvas');
+var context = $canvas[0].getContext('2d');
+
+$(window).on('red', window.alert.bind(window, 'Rot!'));
+$(window).on('yellow', window.alert.bind(window, 'Gelb!'));
+
+// Video-Stream holen, im Video-Element verwenden
+navigator.getUserMedia({
+  video: true,
+  audio: false
+}, function(stream){
+  var streamUrl = window.URL.createObjectURL(stream);
+  $video.attr('src', streamUrl);
+}, function(err){
+  console.error(err);
+});
+
+// Video-Maße anwenden und abspielen des Streams starten
+$video.on('canplay', function(){
+  $canvas.add($video).attr({
+    width: video.videoWidth,
+    height: video.videoHeight
+  });
+  video.play();
+});
+
+// Video auf die Canvas übertragen
+$video.on('play', function(){
+  requestAnimationFrame(function copyVideo(){
+    context.drawImage(video, 0, 0);
+    requestAnimationFrame(copyVideo);
+  });
+});
+
+// Beim Abspielen des Videos Erkennen starten
+$video.on('play', function(){
+  requestAnimationFrame(detect);
+});
+
+// Hintergrundprozess staten
+var process = new Worker('worker.js');
+
+// RGBA-Daten an den Worker posten
+function detect(){
+  var rgba = context.getImageData(0, 0, video.width, video.height).data;
+  process.postMessage(rgba);
+}
+
+// Daten empfangen
+process.onmessage = function(evt){
+  var result = evt.data;
+  if(result === 'red'){
+    $(window).trigger('red');
+  }
+  else if(result === 'yellow'){
+    $(window).trigger('yellow');
+  }
+  requestAnimationFrame(detect); // Erkennung fortsetzen
+};
+
+</script>
